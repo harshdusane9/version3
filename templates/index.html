@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Interview Trainer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #f9fafb;
+      font-family: "Inter", sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .gradient-text {
+      background: linear-gradient(90deg, #2563eb, #7c3aed);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+
+    .loading {
+      border: 4px solid #e5e7eb;
+      border-top: 4px solid #2563eb;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      animation: spin 0.9s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="w-full max-w-3xl bg-white rounded-2xl shadow-lg p-8">
+    <h1 class="text-3xl font-bold mb-2 gradient-text">AI Interview Trainer</h1>
+    <p class="text-gray-600 mb-6">One question at a time. Answer, submit, get a clean scorecard and feedback.</p>
+
+    <!-- Job description -->
+    <div class="mb-6">
+      <label for="job" class="block text-lg font-semibold mb-2 text-gray-800">Job description</label>
+      <textarea id="job" rows="3" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Product Manager at Spotify"></textarea>
+    </div>
+
+    <!-- Buttons -->
+    <div class="flex gap-3 mb-6">
+      <button id="startBtn" class="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition-all">Start Interview</button>
+      <button id="resetBtn" class="bg-gray-200 px-5 py-2 rounded-md hover:bg-gray-300 transition-all">Reset</button>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="hidden text-center">
+      <div class="loading"></div>
+      <p class="text-gray-500 mt-2">Preparing your interview questions...</p>
+    </div>
+
+    <!-- Question & Answer Section -->
+    <div id="qaSection" class="hidden">
+      <h2 id="questionHeader" class="text-lg font-semibold mb-2 text-gray-800"></h2>
+      <p id="questionText" class="text-gray-800 mb-4"></p>
+      <label for="answer" class="block text-gray-700 font-medium mb-2">Your answer</label>
+      <textarea id="answer" rows="5" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      <div class="flex gap-3 mt-4">
+        <button id="submitBtn" class="bg-green-600 text-white px-5 py-2 rounded-md hover:bg-green-700 transition-all">Submit Answer</button>
+        <button id="nextBtn" class="bg-blue-500 text-white px-5 py-2 rounded-md hover:bg-blue-600 transition-all hidden">Next Question</button>
+      </div>
+    </div>
+
+    <!-- Evaluation Section -->
+    <div id="evaluation" class="hidden mt-6 bg-white p-6 rounded-lg shadow-md fade-in">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800">Evaluation Result</h2>
+      <div id="scoreGrid" class="grid grid-cols-2 gap-4"></div>
+      <p id="totalScore" class="text-lg font-semibold text-gray-800 mt-4"></p>
+
+      <div id="feedbackSection" class="mt-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-2">Feedback</h3>
+        <p id="summaryText" class="text-gray-700 leading-relaxed"></p>
+      </div>
+
+      <div id="tipsSection" class="mt-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-2">Improvement Tips</h3>
+        <ul id="improvementList" class="list-disc list-inside text-gray-700"></ul>
+      </div>
+    </div>
+
+    <!-- ✅ Summary Report Section -->
+    <div id="summaryReport" class="hidden mt-8 bg-white p-6 rounded-xl shadow-md fade-in">
+      <h2 class="text-2xl font-bold mb-4 gradient-text">Final Summary Report</h2>
+      <p id="overallScore" class="text-lg text-gray-800 font-semibold mb-2"></p>
+      <p id="questionCount" class="text-gray-700 mb-2"></p>
+      <div id="averageBreakdown" class="text-gray-700 mb-4"></div>
+      <p id="finalRemarks" class="text-gray-800 font-medium mt-4"></p>
+    </div>
+
+    <p class="text-gray-500 mt-8 text-sm text-center">Keep practicing — aim to improve clarity & confidence each round.</p>
+  </div>
+
+  <script>
+    const startBtn = document.getElementById("startBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const loadingDiv = document.getElementById("loading");
+    const qaSection = document.getElementById("qaSection");
+    const questionHeader = document.getElementById("questionHeader");
+    const questionText = document.getElementById("questionText");
+    const submitBtn = document.getElementById("submitBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const evaluationDiv = document.getElementById("evaluation");
+    const summaryDiv = document.getElementById("summaryReport");
+
+    let questions = [];
+    let currentIndex = 0;
+    let totalScores = [];
+    let categoryScores = {};
+
+    startBtn.addEventListener("click", async () => {
+      const job = document.getElementById("job").value.trim();
+      if (!job) return alert("Please enter a job description.");
+
+      loadingDiv.classList.remove("hidden");
+      qaSection.classList.add("hidden");
+      evaluationDiv.classList.add("hidden");
+      summaryDiv.classList.add("hidden");
+
+      try {
+        const response = await fetch("/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_description: job })
+        });
+
+        const data = await response.json();
+        loadingDiv.classList.add("hidden");
+
+        if (data.questions) {
+          questions = data.questions;
+          currentIndex = 0;
+          totalScores = [];
+          categoryScores = {};
+          showQuestion();
+        } else {
+          alert("Failed to load questions.");
+        }
+      } catch (err) {
+        loadingDiv.classList.add("hidden");
+        alert("Error generating questions.");
+      }
+    });
+
+    function showQuestion() {
+      qaSection.classList.remove("hidden");
+      evaluationDiv.classList.add("hidden");
+      summaryDiv.classList.add("hidden");
+
+      const q = questions[currentIndex];
+      questionHeader.innerText = `Question ${currentIndex + 1} of ${questions.length}`;
+      questionText.innerText = q;
+      document.getElementById("answer").value = "";
+      submitBtn.classList.remove("hidden");
+      nextBtn.classList.add("hidden");
+    }
+
+    submitBtn.addEventListener("click", async () => {
+      const question = questions[currentIndex];
+      const answer = document.getElementById("answer").value.trim();
+      if (!answer) return alert("Please write your answer.");
+
+      submitBtn.disabled = true;
+      submitBtn.innerText = "Evaluating...";
+      evaluationDiv.classList.add("hidden");
+
+      try {
+        const res = await fetch("/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, answer })
+        });
+        const data = await res.json();
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Submit Answer";
+
+        if (data.evaluation) showEvaluation(data.evaluation);
+      } catch (err) {
+        alert("Error evaluating answer.");
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Submit Answer";
+      }
+    });
+
+    function showEvaluation(ev) {
+      evaluationDiv.classList.remove("hidden");
+      evaluationDiv.classList.add("fade-in");
+
+      const grid = document.getElementById("scoreGrid");
+      grid.innerHTML = "";
+      let total = 0, count = 0;
+
+      if (ev.scores) {
+        Object.entries(ev.scores).forEach(([key, value]) => {
+          grid.innerHTML += `
+            <div class="bg-gray-50 p-3 rounded-md shadow-sm flex justify-between">
+              <span class="font-medium text-gray-800">${key}</span>
+              <span class="text-blue-600 font-semibold">${value}/10</span>
+            </div>
+          `;
+          total += value;
+          count++;
+          if (!categoryScores[key]) categoryScores[key] = [];
+          categoryScores[key].push(value);
+        });
+      }
+
+      const totalPercent = ev.total || Math.round((total / (count * 10)) * 100);
+      totalScores.push(totalPercent);
+
+      document.getElementById("totalScore").innerHTML =
+        `Total Score: <span class='text-blue-600'>${totalPercent} / 100</span>`;
+
+      document.getElementById("summaryText").innerText = ev.summary || "";
+      const tipsList = document.getElementById("improvementList");
+      tipsList.innerHTML = "";
+      if (ev.improvement_tips && ev.improvement_tips.length > 0) {
+        ev.improvement_tips.forEach(tip => {
+          tipsList.innerHTML += `<li>${tip}</li>`;
+        });
+      }
+
+      nextBtn.classList.remove("hidden");
+    }
+
+    nextBtn.addEventListener("click", () => {
+      if (currentIndex < questions.length - 1) {
+        currentIndex++;
+        showQuestion();
+      } else {
+        qaSection.classList.add("hidden");
+        evaluationDiv.classList.add("hidden");
+        showSummaryReport();
+      }
+    });
+
+    function showSummaryReport() {
+      summaryDiv.classList.remove("hidden");
+      summaryDiv.classList.add("fade-in");
+
+      const avgScore = Math.round(totalScores.reduce((a, b) => a + b, 0) / totalScores.length);
+      document.getElementById("overallScore").innerHTML = `Overall Average Score: <span class='text-blue-600 font-semibold'>${avgScore} / 100</span>`;
+      document.getElementById("questionCount").innerText = `Questions Answered: ${totalScores.length}`;
+
+      const breakdownDiv = document.getElementById("averageBreakdown");
+      breakdownDiv.innerHTML = "<strong>Category Averages:</strong><br>";
+      for (const [key, values] of Object.entries(categoryScores)) {
+        const avg = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
+        breakdownDiv.innerHTML += `${key}: <span class='text-blue-600 font-medium'>${avg}/10</span><br>`;
+      }
+
+      document.getElementById("finalRemarks").innerText =
+        avgScore >= 80
+          ? "Excellent performance! You're interview-ready."
+          : avgScore >= 60
+          ? "Good effort! A bit more refinement and you'll be perfect."
+          : "Keep practicing — focus on structure and clarity.";
+    }
+
+    resetBtn.addEventListener("click", () => location.reload());
+  </script>
+</body>
+</html>
